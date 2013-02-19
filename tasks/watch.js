@@ -1,17 +1,4 @@
-/*
- * grunt-contrib-watch
- * http://gruntjs.com/
- *
- * Copyright (c) 2012 "Cowboy" Ben Alman, contributors
- * Licensed under the MIT license.
- */
-
 module.exports = function(grunt) {
-  'use strict';
-
-  // TODO: ditch this when grunt v0.4 is released
-  grunt.util = grunt.util || grunt.utils;
-
   var path = require('path');
   var fs = require('fs');
   var Gaze = require('gaze').Gaze;
