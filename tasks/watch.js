@@ -4,6 +4,7 @@ module.exports = function(grunt) {
 
   // Nodejs libs.
   var fs = require('fs');
+  var path = require('path');
 
   // ==========================================================================
   // TASKS
@@ -38,7 +39,7 @@ module.exports = function(grunt) {
     var taskDone = this.async();
     // Get a list of files to be watched.
     var patterns = grunt.util._.pluck(targets, 'files');
-    var getFiles = grunt.file.expandFiles.bind(grunt.file, patterns);
+    var getFiles = function() { return grunt.file.expand({filter: 'isFile'}, patterns); }
     // This task's name + optional args, in string format.
     var nameArgs = this.nameArgs;
     // An ID by which the setInterval can be canceled.
@@ -72,7 +73,7 @@ module.exports = function(grunt) {
         // Add filepath to grunt.file.watchFiles for grunt.file.expand* methods.
         grunt.file.watchFiles[status === 'deleted' ? 'deleted' : 'changed'].push(filepath);
         // Clear the modified file's cached require data.
-        grunt.file.clearRequireCache(filepath);
+        clearRequireCache(filepath);
       });
       // Unwatch all watched files.
       Object.keys(watchedFiles).forEach(unWatchFile);
@@ -158,5 +159,20 @@ module.exports = function(grunt) {
       });
     }, 200);
   });
+
+  // Clear the require cache for all passed filepaths.
+  var clearRequireCache = function() {
+    // If a non-string argument is passed, it's an array of filepaths, otherwise
+    // each filepath is passed individually.
+    var filepaths = typeof arguments[0] !== 'string' ? arguments[0] : grunt.util.toArray(arguments);
+    // For each filepath, clear the require cache, if necessary.
+    filepaths.forEach(function(filepath) {
+      var abspath = path.resolve(filepath);
+      if (require.cache[abspath]) {
+        grunt.verbose.write('Clearing require cache for "' + filepath + '" file...').ok();
+        delete require.cache[abspath];
+      }
+    });
+  };
 
 };
