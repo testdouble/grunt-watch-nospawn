@@ -1,118 +1,162 @@
+'use strict';
+
 module.exports = function(grunt) {
-  var path = require('path');
+
+  // Nodejs libs.
   var fs = require('fs');
-  var Gaze = require('gaze').Gaze;
 
-  // In Nodejs 0.8.0, existsSync moved from path -> fs.
-  // TODO: When 0.4 is release, use grunt.file.exists
-  fs.existsSync = fs.existsSync || path.existsSync;
+  // ==========================================================================
+  // TASKS
+  // ==========================================================================
 
-  // Default options for the watch task
-  var defaults = {
-    interrupt: false
-  };
+  // Keep track of last modified times of files, in case files are reported to
+  // have changed incorrectly.
+  var mtimes = {};
 
   grunt.registerTask('watch', 'Run predefined tasks whenever watched files change.', function(target) {
-    var name = this.name || 'watch';
-    this.requiresConfig(name);
-    // Build an array of files/tasks objects
-    var watch = grunt.config(name);
+    this.requiresConfig('watch');
+    // Build an array of files/tasks objects.
+    var watch = grunt.config('watch');
     var targets = target ? [target] : Object.keys(watch).filter(function(key) {
       return typeof watch[key] !== 'string' && !Array.isArray(watch[key]);
     });
     targets = targets.map(function(target) {
-      // Fail if any required config properties have been omitted
-      target = [name, target];
+      // Fail if any required config properties have been omitted.
+      target = ['watch', target];
       this.requiresConfig(target.concat('files'), target.concat('tasks'));
       return grunt.config(target);
     }, this);
 
-    // Allow "basic" non-target format
+    // Allow "basic" non-target format.
     if (typeof watch.files === 'string' || Array.isArray(watch.files)) {
       targets.push({files: watch.files, tasks: watch.tasks});
     }
 
-    // Message to display when waiting for changes
-    var waiting = 'Waiting...';
+    grunt.log.write('Waiting...');
+
+    // This task is asynchronous.
+    var taskDone = this.async();
+    // Get a list of files to be watched.
+    var patterns = grunt.util._.pluck(targets, 'files');
+    var getFiles = grunt.file.expandFiles.bind(grunt.file, patterns);
+    // This task's name + optional args, in string format.
+    var nameArgs = this.nameArgs;
+    // An ID by which the setInterval can be canceled.
+    var intervalId;
+    // Files that are being watched.
+    var watchedFiles = {};
     // File changes to be logged.
-    var changedFiles = Object.create(null);
-    // Keep track of spawns per tasks
-    var spawned = Object.create(null);
+    var changedFiles = {};
+
     // List of changed / deleted file paths.
-    grunt.file.watchFiles = {changed: [], deleted: [], added: []};
-    // Get process.argv options without grunt.cli.tasks to pass to child processes
-    var cliArgs = grunt.util._.without.apply(null, [[].slice.call(process.argv, 2)].concat(grunt.cli.tasks));
+    grunt.file.watchFiles = {changed: [], deleted: []};
 
-    // Call to close this task
-    var done = this.async();
-    grunt.log.write(waiting);
+    // Define an alternate fail "warn" behavior.
+    grunt.fail.warnAlternate = function() {
+      grunt.task.clearQueue({untilMarker: true}).run(nameArgs);
+    };
 
-    // Run the tasks for the changed files
-    var runTasks = grunt.util._.debounce(function runTasks(i, tasks, options) {
-      // If interrupted, reset the spawned for a target
-      if (options.interrupt && typeof spawned[i] === 'object') {
-        grunt.log.writeln('').write('Previously spawned task has been interrupted...'.yellow);
-        spawned[i].kill('SIGINT');
-        delete spawned[i];
-      }
-      // Only spawn one at a time unless interrupt is specified
-      if (!spawned[i]) {
-        grunt.log.ok();
-        var fileArray = Object.keys(changedFiles);
-        fileArray.forEach(function(filepath) {
-          // Log which file has changed, and how.
-          grunt.log.ok('File "' + filepath + '" ' + changedFiles[filepath] + '.');
-        });
-        // Reset changedFiles
-        changedFiles = Object.create(null);
-        // Spawn the tasks as a child process
-        spawned[i] = grunt.util.spawn({
-          // Use the node that spawned this process
-          cmd: process.argv[0],
-          // Run from current working dir
-          opts: {cwd: process.cwd()},
-          // Run grunt this process uses, append the task to be run and any cli options
-          args: grunt.util._.union([process.argv[1]].concat(tasks), cliArgs)
-        }, function(err, res, code) {
-          // Spawn is done
-          delete spawned[i];
-          grunt.log.writeln('').write(waiting);
-        });
-        // Display stdout/stderr immediately
-        spawned[i].stdout.on('data', function(buf) { grunt.log.write(String(buf)); });
-        spawned[i].stderr.on('data', function(buf) {
-          buf = grunt.log.uncolor(String(buf));
-          if (!grunt.util._.isBlank(buf)) { grunt.log.error(buf); }
-        });
-      }
+    // Cleanup when files have changed. This is debounced to handle situations
+    // where editors save multiple files "simultaneously" and should wait until
+    // all the files are saved.
+    var done = grunt.util._.debounce(function() {
+      // Clear the files-added setInterval.
+      clearInterval(intervalId);
+      // Ok!
+      grunt.log.ok();
+      var fileArray = Object.keys(changedFiles);
+      fileArray.forEach(function(filepath) {
+        var status = changedFiles[filepath];
+        // Log which file has changed, and how.
+        grunt.log.ok('File "' + filepath + '" ' + status + '.');
+        // Add filepath to grunt.file.watchFiles for grunt.file.expand* methods.
+        grunt.file.watchFiles[status === 'deleted' ? 'deleted' : 'changed'].push(filepath);
+        // Clear the modified file's cached require data.
+        grunt.file.clearRequireCache(filepath);
+      });
+      // Unwatch all watched files.
+      Object.keys(watchedFiles).forEach(unWatchFile);
+      // For each specified target, test to see if any files matching that
+      // target's file patterns were modified.
+      targets.forEach(function(target) {
+        // What files in fileArray match the target.files pattern(s)?
+        var files = grunt.file.match(target.files, fileArray);
+        // Enqueue specified tasks if at least one matching file was found.
+        if (files.length > 0 && target.tasks) {
+          grunt.task.run(target.tasks).mark();
+        }
+      });
+      // Enqueue the watch task, so that it loops.
+      grunt.task.run(nameArgs);
+      // Continue task queue.
+      taskDone();
     }, 250);
 
-    targets.forEach(function(target, i) {
-      if (typeof target.files === 'string') {
-        target.files = [target.files];
+    // Handle file changes.
+    function fileChanged(status, filepath) {
+      // If file was deleted and then re-added, consider it changed.
+      if (changedFiles[filepath] === 'deleted' && status === 'added') {
+        status = 'changed';
       }
-      // Get patterns to glob for this target
-      var patterns = grunt.util._.chain(target.files).flatten().uniq().value();
-      // Default options per target
-      var options = grunt.util._.defaults(target.options || {}, defaults);
-      // Create watcher per target
-      var gaze = new Gaze(patterns, options, function(err) {
-        if (err) {
-          grunt.log.error(err.message);
-          return done();
-        }
-        // On changed/added/deleted
-        this.on('all', function(status, filepath) {
-          filepath = path.relative(process.cwd(), filepath);
-          changedFiles[filepath] = status;
-          runTasks(i, target.tasks, options);
-        });
-        // On watcher error
-        this.on('error', function(err) { grunt.log.error(err); });
-      });
-    });
+      // Keep track of changed status for later.
+      changedFiles[filepath] = status;
+      // Execute debounced done function.
+      done();
+    }
 
-    // Keep the process alive
-    setInterval(function() {}, 250);
+    // Watch a file.
+    function watchFile(filepath) {
+      if (!watchedFiles[filepath]) {
+        // Watch this file for changes. This probably won't scale to hundreds of
+        // files.. but I bet someone will try it!
+        watchedFiles[filepath] = fs.watch(filepath, function(event) {
+          var mtime;
+          // Has the file been deleted?
+          var deleted = !grunt.file.exists(filepath);
+          if (deleted) {
+            // If file was deleted, stop watching file.
+            unWatchFile(filepath);
+            // Remove from mtimes.
+            delete mtimes[filepath];
+          } else {
+            // Get last modified time of file.
+            mtime = +fs.statSync(filepath).mtime;
+            // If same as stored mtime, the file hasn't changed.
+            if (mtime === mtimes[filepath]) { return; }
+            // Otherwise it has, store mtime for later use.
+            mtimes[filepath] = mtime;
+          }
+          // Call "change" for this file, setting status appropriately (rename ->
+          // renamed, change -> changed).
+          fileChanged(deleted ? 'deleted' : event + 'd', filepath);
+        });
+      }
+    }
+
+    // Unwatch a file.
+    function unWatchFile(filepath) {
+      if (watchedFiles[filepath]) {
+        // Close watcher.
+        watchedFiles[filepath].close();
+        // Remove from watched files.
+        delete watchedFiles[filepath];
+      }
+    }
+
+    // Watch all currently existing files for changes.
+    getFiles().forEach(watchFile);
+
+    // Watch for files to be added.
+    intervalId = setInterval(function() {
+      // Files that have been added since last interval execution.
+      var added = grunt.util._.difference(getFiles(), Object.keys(watchedFiles));
+      added.forEach(function(filepath) {
+        // This file has been added.
+        fileChanged('added', filepath);
+        // Watch this file.
+        watchFile(filepath);
+      });
+    }, 200);
   });
+
 };
