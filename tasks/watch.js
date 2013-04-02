@@ -39,7 +39,7 @@ module.exports = function(grunt) {
     var taskDone = this.async();
     // Get a list of files to be watched.
     var patterns = grunt.util._.pluck(targets, 'files');
-    var getFiles = function() { return grunt.file.expand({filter: 'isFile'}, patterns); }
+    var getFiles = function() { return grunt.file.expand({filter: 'isFile', cwd: process.cwd()}, patterns); }
     // This task's name + optional args, in string format.
     var nameArgs = this.nameArgs;
     // An ID by which the setInterval can be canceled.
