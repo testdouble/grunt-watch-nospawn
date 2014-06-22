@@ -5,6 +5,7 @@ module.exports = function(grunt) {
   // Nodejs libs.
   var fs = require('fs');
   var path = require('path');
+  var livereload;
 
   // ==========================================================================
   // TASKS
@@ -21,10 +22,29 @@ module.exports = function(grunt) {
     var targets = target ? [target] : Object.keys(watch).filter(function(key) {
       return typeof watch[key] !== 'string' && !Array.isArray(watch[key]);
     });
+
+    //-- Nasty live reloader hacks
+    var liveReloaders = {},
+        defaultLiveReloader,
+        taskLRConfig = grunt.config([self.name, 'options', 'livereload']);
+    if(taskLRConfig) {
+      defaultLiveReloader = require('./lib/livereload')(grunt)(taskLRConfig);
+    }
+    var createLiveReloaderFor = function(target) {
+      // If a default livereload server for all targets
+      // Use task level unless target level overrides
+      var targetLRConfig = grunt.config([self.name, target, 'options', 'livereload']);
+      if (targetLRConfig || taskLRConfig) {
+        liveReloaders[target] = targetLRConfig ? require('./lib/livereload')(grunt)(targetLRConfig) : defaultLiveReloader;
+      }
+    };
+    //-- / Nasty livereloader hacks
+
     targets = targets.map(function(target) {
       // Fail if any required config properties have been omitted.
       target = ['watch', target];
       this.requiresConfig(target.concat('files'), target.concat('tasks'));
+      createLiveReloaderFor(target)
       return grunt.config(target);
     }, this);
 
@@ -90,6 +110,11 @@ module.exports = function(grunt) {
       // Enqueue the watch task, so that it loops.
       grunt.task.run(nameArgs);
       // Continue task queue.
+      // Trigger livereload if necessary
+      if (livereload) {
+        livereload.trigger(fileArray);
+      }
+
       taskDone();
     }, 250);
 
