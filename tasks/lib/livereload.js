@@ -9,7 +9,6 @@
 'use strict';
 
 var tinylr = require('tiny-lr-fork');
-var _ = require('lodash');
 
 // Holds the servers out of scope in case watch is reloaded
 var servers = Object.create(null);
@@ -24,7 +23,7 @@ module.exports = function(grunt) {
     } else if (typeof options === 'number') {
       options = {port: options};
     } else {
-      options = _.defaults(options, defaults);
+      options.port = options.port || defaults.port;
     }
     if (servers[options.port]) {
       this.server = servers[options.port];
