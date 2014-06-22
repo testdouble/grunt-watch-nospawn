@@ -26,12 +26,15 @@
     "node": ">= 0.8.0"
   },
   "dependencies": {
-    "gaze": "0.3.3"
+    "gaze": "0.3.3",
+    "tiny-lr-fork": "0.0.5"
   },
   "devDependencies": {
     "grunt": "0.4.0"
   },
   "keywords": [
-    "gruntplugin", "watch", "lineman"
+    "gruntplugin",
+    "watch",
+    "lineman"
   ]
 }

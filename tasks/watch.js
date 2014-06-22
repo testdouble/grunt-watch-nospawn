@@ -5,6 +5,7 @@ module.exports = function(grunt) {
   // Nodejs libs.
   var fs = require('fs');
   var path = require('path');
+  var livereload;
 
   // ==========================================================================
   // TASKS
@@ -15,15 +16,23 @@ module.exports = function(grunt) {
   var mtimes = {};
 
   grunt.registerTask('watch', 'Run predefined tasks whenever watched files change.', function(target) {
-    this.requiresConfig('watch');
+    var taskName = this.name; //'watch'
+    this.requiresConfig(taskName);
     // Build an array of files/tasks objects.
-    var watch = grunt.config('watch');
+    var watch = grunt.config(taskName);
     var targets = target ? [target] : Object.keys(watch).filter(function(key) {
-      return typeof watch[key] !== 'string' && !Array.isArray(watch[key]);
+      return typeof watch[key] !== 'string' && !Array.isArray(watch[key]) && key !== "options";
     });
+
+    var livereload,
+        taskLRConfig = grunt.config([taskName, 'options', 'livereload']);
+    if(taskLRConfig) {
+      livereload = require('./lib/livereload')(grunt)(taskLRConfig);
+    }
+
     targets = targets.map(function(target) {
       // Fail if any required config properties have been omitted.
-      target = ['watch', target];
+      target = [taskName, target];
       this.requiresConfig(target.concat('files'), target.concat('tasks'));
       return grunt.config(target);
     }, this);
@@ -90,6 +99,11 @@ module.exports = function(grunt) {
       // Enqueue the watch task, so that it loops.
       grunt.task.run(nameArgs);
       // Continue task queue.
+      // Trigger livereload if necessary
+      if (livereload) {
+        livereload.trigger(fileArray);
+      }
+
       taskDone();
     }, 250);
 
