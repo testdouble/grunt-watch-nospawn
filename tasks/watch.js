@@ -21,7 +21,7 @@ module.exports = function(grunt) {
     // Build an array of files/tasks objects.
     var watch = grunt.config(taskName);
     var targets = target ? [target] : Object.keys(watch).filter(function(key) {
-      return typeof watch[key] !== 'string' && !Array.isArray(watch[key]);
+      return typeof watch[key] !== 'string' && !Array.isArray(watch[key]) && key !== "options";
     });
 
     var livereload,
