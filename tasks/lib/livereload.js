@@ -40,7 +40,7 @@ module.exports = function(grunt) {
       });
       this.server.listen(options.port, function(err) {
         if (err) { return grunt.fatal(err); }
-        grunt.log.verbose.writeln('Live reload server started on port: ' + options.port);
+        grunt.log.writeln('LiveReload server started on port: ' + options.port);
       });
       servers[options.port] = this.server;
     }

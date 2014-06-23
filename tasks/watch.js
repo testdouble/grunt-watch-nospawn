@@ -25,7 +25,7 @@ module.exports = function(grunt) {
     });
 
     var livereload,
-        taskLRConfig = grunt.config([taskName, 'options', 'livereload']);
+        taskLRConfig = grunt.config([taskName, 'options', 'livereload']) || grunt.config('livereload');
     if(taskLRConfig) {
       livereload = require('./lib/livereload')(grunt)(taskLRConfig);
     }
@@ -42,7 +42,7 @@ module.exports = function(grunt) {
       targets.push({files: watch.files, tasks: watch.tasks});
     }
 
-    grunt.log.write('Waiting...');
+    grunt.log.writeln('Waiting...');
 
     // This task is asynchronous.
     var taskDone = this.async();
