@@ -12,7 +12,7 @@ module.exports = function(grunt) {
   // ==========================================================================
 
   // Keep track of last modified times of files, in case files are reported to
-  // have changed incorrectly. Also used to detect chnages during task runs.
+  // have changed incorrectly.
   var mtimes = {};
 
   grunt.registerTask('watch', 'Run predefined tasks whenever watched files change.', function(target) {
@@ -166,34 +166,14 @@ module.exports = function(grunt) {
       // Files that have been added since last interval execution.
       var added = grunt.util._.difference(getFiles(), Object.keys(watchedFiles));
       added.forEach(function(filepath) {
-        // Get last modified time of file - update this first so it is as early as poss.
-        // this means addtitional changes can't be accidentlayy eaten by the mtime filter.
-        var mtime = +fs.statSync(filepath).mtime;
-        mtimes[filepath] = mtime
         // This file has been added.
         fileChanged('added', filepath);
         // Watch this file.
         watchFile(filepath);
       });
     }, 200);
-
-    //Walk the watchedList and see if they differ from our recorded mtimes
-    Object.keys(watchedFiles).forEach(function(filepath) {
-      var mtime = +fs.statSync(filepath).mtime;
-      if (filepath in mtimes) {
-        if (mtime !=  mtimes[filepath]) {
-          mtimes[filepath] = mtime;
-          fileChanged('changed', filepath);
-        }
-      } else {
-        mtime = +fs.statSync(filepath).mtime;
-        mtimes[filepath] = mtime;
-        fileChanged('added', filepath);
-      }
-    });
-
-
   });
+
   // Clear the require cache for all passed filepaths.
   var clearRequireCache = function() {
     // If a non-string argument is passed, it's an array of filepaths, otherwise
