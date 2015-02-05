@@ -94,15 +94,18 @@ module.exports = function(grunt) {
         // Enqueue specified tasks if at least one matching file was found.
         if (files.length > 0 && target.tasks) {
           grunt.task.run(target.tasks).mark();
+          // Trigger livereload if necessary
+          if(livereload){
+            grunt.registerTask('livereload', function() {
+               livereload.trigger(fileArray);
+            });
+            grunt.task.run('livereload');
+          };
         }
       });
       // Enqueue the watch task, so that it loops.
       grunt.task.run(nameArgs);
       // Continue task queue.
-      // Trigger livereload if necessary
-      if (livereload) {
-        livereload.trigger(fileArray);
-      }
 
       taskDone();
     }, 250);
