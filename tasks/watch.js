@@ -84,6 +84,12 @@ module.exports = function(grunt) {
         // Clear the modified file's cached require data.
         clearRequireCache(filepath);
       });
+      
+      //Add trigger to grunt task so it is possible to que livereload after e.g. Sass compile
+      grunt.registerTask('livereloadTrigger', function() {
+-               livereload.trigger(fileArray);
+-     });
+
       // Unwatch all watched files.
       Object.keys(watchedFiles).forEach(unWatchFile);
       // For each specified target, test to see if any files matching that
@@ -96,10 +102,7 @@ module.exports = function(grunt) {
           grunt.task.run(target.tasks).mark();
           // Trigger livereload if necessary
           if(livereload){
-            grunt.registerTask('livereload', function() {
-               livereload.trigger(fileArray);
-            });
-            grunt.task.run('livereload');
+            grunt.task.run('livereloadTrigger');
           };
         }
       });
