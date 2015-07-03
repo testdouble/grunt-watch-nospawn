@@ -87,8 +87,8 @@ module.exports = function(grunt) {
       
       //Add trigger to grunt task so it is possible to que livereload after e.g. Sass compile
       grunt.registerTask('livereloadTrigger', function() {
--               livereload.trigger(fileArray);
--     });
+        livereload.trigger(fileArray);
+      });
 
       // Unwatch all watched files.
       Object.keys(watchedFiles).forEach(unWatchFile);
