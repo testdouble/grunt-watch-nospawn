@@ -1,7 +1,7 @@
 {
   "name": "grunt-watch-nospawn",
   "description": "Run predefined tasks whenever watched file patterns are added, changed or deleted.",
-  "version": "0.0.8",
+  "version": "0.1.0",
   "homepage": "https://github.com/testdouble/grunt-watch-nospawn",
   "author": {
     "name": "Justin Searls",
